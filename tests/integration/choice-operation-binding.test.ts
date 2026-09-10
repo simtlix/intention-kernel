@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { agentId, capabilityId, defineAgent, defineCapability, defineSchema } from "../../src/index.js";
 import { compileAgentDefinition } from "../../src/compiler/compileAgentDefinition.js";
 import { buildContextSnapshot } from "../../src/context/buildContextSnapshot.js";
@@ -39,6 +40,23 @@ async function fixture(text = "AT") {
 }
 
 describe("choice operation review binds requested operations to the proposed capability set", () => {
+  it("binds the visible label and position to the same opaque option ID in generation and validation", async () => {
+    const current = await fixture("2");
+    const valid = { meaning: "unique_option", optionId: "second", position: 2, label: "Second automatic product", rationale: "The second displayed option." };
+    const gateway = new Gateway([valid]);
+    const reviewed = await reviewChoiceCapabilitySelection({ ...current, gateway, signal });
+    const outputSchema = gateway.requests[0]?.outputSchema;
+    const json = await outputSchema?.jsonSchema?.();
+    if (!json || !outputSchema) throw Error("Missing choice review schema");
+    const generated = z.fromJSONSchema(json);
+    expect(generated.safeParse({ meaning: "unique_option", optionId: "first", rationale: "The second displayed option." }).success).toBe(false);
+    expect(generated.safeParse(valid).success).toBe(true);
+    expect(reviewed.reviewedChoice?.optionId).toBe("second");
+    for (const invalid of [{ ...valid, optionId: "first" }, { ...valid, position: 1 }, { ...valid, label: "First automatic product" }]) {
+      expect(generated.safeParse(invalid).success).toBe(false);
+      expect((await outputSchema.validate(invalid)).ok).toBe(false);
+    }
+  });
   it("resumes the sole durable collector with its original input without another interpretation call", async () => {
     const current = await fixture("2");
     const snapshot = { ...current.snapshot,
@@ -48,7 +66,7 @@ describe("choice operation review binds requested operations to the proposed cap
         intention: { id: "durable-intention" as never, objective: "Original operation", proposedCapability: selectId,
           input: { original: "preserved" }, resolution: "resolved" as const, references: [], evidence: current.selection.evidence } }],
     };
-    const gateway = new Gateway([current.selection, { meaning: "unique_option", optionId: "second", rationale: "Current second option." }]);
+    const gateway = new Gateway([current.selection, { meaning: "unique_option", optionId: "second", position: 2, label: "Second automatic product", rationale: "Current second option." }]);
     const selection = await selectCapabilities({ snapshot, gateway, signal });
     const batch = await interpretTurn({ ...current, snapshot, selection, gateway, signal });
     const plan = await createTurnPlan({ batch, snapshot, compiled: current.compiled, ids: { next: kind => kind } });
@@ -62,7 +80,7 @@ describe("choice operation review binds requested operations to the proposed cap
   it.each(["2", "la segunda"])("preserves the reviewed option for %s when interpretation repeats an earlier request", async text => {
     const current = await fixture(text);
     const gateway = new Gateway([current.selection,
-      { meaning: "unique_option", optionId: "second", rationale: "The current positional reference selects the second product." },
+      { meaning: "unique_option", optionId: "second", position: 2, label: "Second automatic product", rationale: "The current positional reference selects the second product." },
       { intentions: [{ objective: "Earlier search", proposedCapability: selectId, resolution: "resolved", references: [], input: { request: "previous message" }, evidence: current.selection.evidence }], contradictions: [] },
     ]);
     const selection = await selectCapabilities({ snapshot: current.snapshot, gateway, signal });
@@ -81,7 +99,7 @@ describe("choice operation review binds requested operations to the proposed cap
     const current = await fixture("la segunda");
     const intention = { objective: "Choose product", proposedCapability: selectId, resolution: "resolved", references: [], input: {}, evidence: current.selection.evidence };
     const gateway = new Gateway([current.selection,
-      { meaning: "unique_option", optionId: "second", rationale: "The current second option is selected." },
+      { meaning: "unique_option", optionId: "second", position: 2, label: "Second automatic product", rationale: "The current second option is selected." },
       { intentions: [{ ...intention, resolution: "invalid" }], contradictions: [] },
       { intentions: [intention], contradictions: [], answerToInteraction: { interactionId: "products", value: "first", evidence: "earlier message" } },
     ]);
@@ -93,7 +111,7 @@ describe("choice operation review binds requested operations to the proposed cap
 
   it.each(["message", "interaction", "page"])("does not reuse a choice review after the %s changes", async change => {
     const current = await fixture("2");
-    const gateway = new Gateway([current.selection, { meaning: "unique_option", optionId: "second", rationale: "Current second option." }]);
+    const gateway = new Gateway([current.selection, { meaning: "unique_option", optionId: "second", position: 2, label: "Second automatic product", rationale: "Current second option." }]);
     const selection = await selectCapabilities({ snapshot: current.snapshot, gateway, signal });
     const interaction = current.snapshot.interaction;
     if (interaction === undefined) throw Error("Fixture interaction is required");
@@ -158,7 +176,7 @@ describe("choice operation review binds requested operations to the proposed cap
 
   it.each(["unique_option", "ambiguous_or_unrelated"])("preserves the existing %s branch without inventing operation bindings", async meaning => {
     const current = await fixture();
-    const gateway = new Gateway([{ meaning, ...(meaning === "unique_option" ? { optionId: "first" } : {}), rationale: "Current option reference decision." }]);
+    const gateway = new Gateway([{ meaning, ...(meaning === "unique_option" ? { optionId: "first", position: 1, label: "First automatic product" } : {}), rationale: "Current option reference decision." }]);
     const { issues } = await reviewChoiceCapabilitySelection({ ...current, gateway, signal });
     expect(issues.length === 0).toBe(meaning === "unique_option");
   });

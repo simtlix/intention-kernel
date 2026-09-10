@@ -972,6 +972,6 @@ export type ValidationResult<T> = {
 };
 
 // @public
-export const VERSION: "0.8.1";
+export const VERSION: "0.8.2";
 
 ```

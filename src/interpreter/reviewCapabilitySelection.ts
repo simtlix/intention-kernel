@@ -36,10 +36,11 @@ export interface ReviewUnboundSelectionOptions {
   readonly signal: AbortSignal;
 }
 
-function createChoiceReviewSchema(registeredCapabilityIds: readonly string[], optionIds: readonly string[]) {
+function createChoiceReviewSchema(registeredCapabilityIds: readonly string[], options: readonly { id: string; label: string; position: number }[]) {
   const rationale = z.string().min(1);
-  const choiceReviewShape = z.discriminatedUnion("meaning", [
-    z.strictObject({ meaning: z.literal("unique_option"), optionId: z.enum(optionIds), rationale }),
+  const choiceReviewShape = z.union([
+    ...options.map(option => z.strictObject({ meaning: z.literal("unique_option"),
+      position: z.literal(option.position), label: z.literal(option.label), optionId: z.literal(option.id), rationale })),
     z.strictObject({ meaning: z.literal("ambiguous_or_unrelated"), rationale }),
     z.strictObject({ meaning: z.literal("operation_request"), rationale,
       operationCapabilityIds: z.array(z.enum(registeredCapabilityIds)).min(1).max(registeredCapabilityIds.length)
@@ -117,14 +118,15 @@ export async function reviewChoiceCapabilitySelection(
   const context = projectModelContext(options.snapshot);
   const registeredCapabilityIds = [...new Set(options.snapshot.capabilities.map(capability => capability.id))];
   if (registeredCapabilityIds.length === 0) return { issues: [{ message: "Choice operation review requires registered capability contracts.", path: ["capabilityIds"] }] };
-  const choiceReviewSchema = createChoiceReviewSchema(registeredCapabilityIds, (context.interaction?.options ?? []).map(option => option.id));
+  const currentChoice = currentChoiceEvidence(context);
+  const choiceReviewSchema = createChoiceReviewSchema(registeredCapabilityIds, currentChoice?.options ?? []);
   const request = {
     task: "capability-selection.choice-review",
     ...(model === undefined ? {} : { model }),
     ...kernelPrompt("kernel.review-capability-selection.choice-selection-review-system-prompt"),
     input: {
       context,
-      currentChoice: currentChoiceEvidence(context),
+      currentChoice,
       proposedSelection: options.selection,
     },
     outputSchema: choiceReviewSchema,

@@ -9,5 +9,5 @@ Package version for runtime diagnostics; verified against the installed artifact
 **Signature:**
 
 ```typescript
-VERSION: "0.8.1"
+VERSION: "0.8.2"
 ```

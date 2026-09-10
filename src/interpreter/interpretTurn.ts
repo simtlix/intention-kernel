@@ -76,6 +76,7 @@ export async function interpretTurn(options: InterpretTurnOptions): Promise<Inte
     options.ids ?? { next: () => randomUUID() },
     selection.capabilityIds.length === 1 ? selection.capabilityIds[0] : undefined,
     options.snapshot.interaction,
+    selection.mode,
   );
   const initialRequest: ModelRequest<IntentionBatch> = {
     task: "turn.interpret",

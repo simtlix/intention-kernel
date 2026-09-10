@@ -2,6 +2,12 @@
 
 All notable changes are documented here. The project follows Semantic Versioning after `1.0.0`; during `0.x`, a minor release may change the public API.
 
+## 0.8.2 - 2026-09-10
+
+- Bind the visible position, label and opaque ID of a reviewed choice in one schema branch. A model cannot combine the label of one option with another option's ID. Publish the matching choice-review prompt revision for pinned hosts.
+- Make omitted-choice review generation reject contradictory verdict/option pairs and unpublished option IDs, matching runtime validation.
+- Apply selected interpretation mode to generation and validation: conversational turns cannot manufacture unsupported intentions, and non-control modes cannot generate lifecycle cancellations. Existing active-answer ownership and consent reviews remain in force.
+
 ## 0.8.1 - 2026-09-10
 
 - Encode resolution-specific intention requirements in the generated JSON Schema as well as runtime validation: resolved intentions require a capability, ambiguous intentions require alternatives, and unresolved intentions cannot propose operations. Initial and repair requests share the same contract.

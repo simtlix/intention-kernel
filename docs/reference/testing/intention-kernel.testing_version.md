@@ -9,5 +9,5 @@ Package version of these testing helpers, identical to the runtime's VERSION.
 **Signature:**
 
 ```typescript
-TESTING_VERSION: "0.8.1"
+TESTING_VERSION: "0.8.2"
 ```

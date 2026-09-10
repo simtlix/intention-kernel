@@ -1581,6 +1581,29 @@ describe("turn interpretation", () => {
     expect(gateway.requests[0]?.system).toContain("merely resembles capability input");
   });
 
+  it("exposes conversational and lifecycle boundaries in the generation contract", async () => {
+    const compiled = await compiledAgent();
+    const snapshot = buildContextSnapshot({ compiled, checkpoint: checkpoint({ interaction: {
+      id: "pending-search" as never, kind: "choice", capabilityId: capabilityId("product.search"),
+      goal: "Which product?", requestedFacts: [], options: [{ id: "one", label: "First product", value: "one" }],
+    } }), currentMessage: { role: "user", content: "I am not sure", at: "2026-09-03T10:01:00.000Z" } });
+    const invalid = { intentions: [{ objective: "An unselected operation", resolution: "unsupported",
+      references: [], evidence: [{ text: "I am not sure", meaning: "Ambiguous answer", messageIndex: 3 }] }], contradictions: [] };
+    const valid = { intentions: [], contradictions: [] };
+    const gateway = new ScriptedGateway(invalid, valid);
+    const result = await interpretTurn({ snapshot, gateway, selection: { ...conversational, mode: "conversational" }, signal: AbortSignal.timeout(1000) });
+    expect(result.intentions).toEqual([]);
+    for (const request of gateway.requests) {
+      const json = await request.outputSchema.jsonSchema?.();
+      if (!json) throw Error("Missing output schema");
+      const generated = z.fromJSONSchema(json);
+      expect(generated.safeParse(invalid).success).toBe(false);
+      expect(generated.safeParse(valid).success).toBe(true);
+      expect(generated.safeParse({ ...valid, lifecycleActions: [{ kind: "cancel_agenda_item", targetId: "pending-search",
+        evidence: invalid.intentions[0]?.evidence[0] }] }).success).toBe(false);
+    }
+  });
+
   it("does not route an isolated number when no active interaction or agenda item gives it meaning", async () => {
     const gateway = new ScriptedGateway(
       selected("product.search"),

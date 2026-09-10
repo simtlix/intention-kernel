@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { z } from "zod";
 import { agentId, capabilityId, defineAgent, defineCapability, defineSchema } from "../../src/index.js";
 import { compileAgentDefinition } from "../../src/compiler/compileAgentDefinition.js";
 import { buildContextSnapshot } from "../../src/context/buildContextSnapshot.js";
@@ -51,4 +52,17 @@ it("redacts omitted-choice review proposals without changing their durable input
   expect(issues[0]?.message).toContain("option-one");
   expect({ batch, interaction: snapshot.interaction }).toEqual(original);
   expect(batch.answerToInteraction).toBeUndefined();
+  const outputSchema = requests[0]?.outputSchema;
+  const json = await outputSchema?.jsonSchema?.();
+  if (!json || !outputSchema) throw Error("Missing omitted-choice schema");
+  const generated = z.fromJSONSchema(json);
+  for (const invalid of [
+    { verdict: "supported", optionId: null, rationale: "Cannot bind a selected option." },
+    { verdict: "unsupported", optionId: "option-one", rationale: "No selection with a contradictory ID." },
+    { verdict: "supported", optionId: "unpublished", rationale: "Unknown current option." },
+  ]) {
+    expect(generated.safeParse(invalid).success).toBe(false);
+    expect((await outputSchema.validate(invalid)).ok).toBe(false);
+  }
+  expect(generated.safeParse({ verdict: "unsupported", optionId: null, rationale: "Independent refinement." }).success).toBe(true);
 });

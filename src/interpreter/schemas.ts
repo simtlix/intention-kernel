@@ -175,22 +175,29 @@ export function createIntentionBatchSchema(
   ids: KernelIdGenerator,
   soleSelectedCapability?: CapabilityId,
   interaction?: Interaction,
+  mode?: CapabilitySelection["mode"],
 ) {
   const optionIds = interaction?.kind === "choice" ? interaction.options?.map(option => option.id) ?? [] : [];
+  const boundedBatchSchema = rawBatchSchema.extend({
+    intentions: z.array(mode === "conversational" ? intentionSchema.options[0] : intentionSchema),
+    lifecycleActions: mode !== undefined && mode !== "control" && mode !== "selected_with_control"
+      ? z.array(lifecycleActionSchema).max(0).optional()
+      : rawBatchSchema.shape.lifecycleActions,
+  });
   // Generation only needs public option identifiers. Structured host values are
   // recovered and semantically reviewed by interpretTurn, never reconstructed.
   // Retain validation compatibility for gateways returning exact legacy values;
   // the same active-option and consent boundaries still apply after parsing.
   const generationSchema = interaction !== undefined && optionIds.length > 0
-    ? rawBatchSchema.extend({ answerToInteraction: answerSchema.extend({
+    ? boundedBatchSchema.extend({ answerToInteraction: answerSchema.extend({
         interactionId: z.literal(interaction.id),
         value: z.enum(optionIds).describe("Exactly one current option ID. Omit the answer when the message does not unambiguously select an option."),
       }).nullish() })
-    : rawBatchSchema;
+    : boundedBatchSchema;
   return defineSchema<IntentionBatch>({
     vendor: "zod",
     validate: (value) => {
-      const parsed = rawBatchSchema.safeParse(withSoleSelectedCapability(
+      const parsed = boundedBatchSchema.safeParse(withSoleSelectedCapability(
         withoutModelOwnedIntentionIds(value),
         soleSelectedCapability,
       ));

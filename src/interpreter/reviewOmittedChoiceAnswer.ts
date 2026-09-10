@@ -21,7 +21,10 @@ export async function reviewOmittedChoiceAnswer(options: {
     !batch.intentions.some((intention) => intention.resolution === "resolved" && intention.proposedCapability === interaction.capabilityId) ||
     (typeof interaction.payload === "object" && interaction.payload !== null &&
       (interaction.payload as Record<string, unknown>)["kind"] === "progression.group")) return [];
-  const raw = z.strictObject({ verdict: z.enum(["supported", "unsupported"]), optionId: z.string().min(1).nullable(), rationale: z.string().min(1) });
+  const raw = z.discriminatedUnion("verdict", [
+    z.strictObject({ verdict: z.literal("supported"), optionId: z.enum((interaction.options ?? []).map(option => option.id)), rationale: z.string().min(1) }),
+    z.strictObject({ verdict: z.literal("unsupported"), optionId: z.null(), rationale: z.string().min(1) }),
+  ]);
   const schema = defineSchema<z.infer<typeof raw>>({ vendor: "zod", validate: (value) => {
     const parsed = raw.safeParse(value);
     return parsed.success ? { value: parsed.data } : { issues: parsed.error.issues.map((issue) => ({ message: issue.message, path: issue.path })) };
@@ -34,10 +37,9 @@ export async function reviewOmittedChoiceAnswer(options: {
     }, outputSchema: schema, capabilities: [], signal: options.signal,
   });
   const validated = await schema.validate(response.value);
-  if (!validated.ok || (validated.value.verdict === "unsupported" && validated.value.optionId !== null) ||
-    (validated.value.verdict === "supported" && (typeof validated.value.optionId !== "string" || !interaction.options?.some((option) => option.id === validated.value.optionId)))) {
+  if (!validated.ok) {
     return [{ message: "Omitted choice-answer review returned invalid or unpublished option evidence.", path: ["answerToInteraction"] }];
   }
   if (validated.value.verdict === "unsupported") return [];
-  return [{ message: `The current message answers the active choice, but the proposal omitted that answer: ${validated.value.rationale}. Add answerToInteraction for ${interaction.id} with exact server-owned option ID ${String(validated.value.optionId)} and literal current-message evidence. Preserve independently requested intentions. Invoking the owner alone does not answer its choice; never invent a value or use an older option.`, path: ["answerToInteraction"] }];
+  return [{ message: `The current message answers the active choice, but the proposal omitted that answer: ${validated.value.rationale}. Add answerToInteraction for ${interaction.id} with exact server-owned option ID ${validated.value.optionId} and literal current-message evidence. Preserve independently requested intentions. Invoking the owner alone does not answer its choice; never invent a value or use an older option.`, path: ["answerToInteraction"] }];
 }

@@ -41,7 +41,8 @@ describe("active choice with additional capability selection", () => {
       },
     } });
     const proposed = { mode: "selected", capabilityIds: [activeId, extraId], rationale: "Selection and prior pending decision", evidence };
-    const unique = { meaning: "unique_option", optionId: position === 1 ? "first" : "second", rationale: "The user identifies one current option of the active financing interaction." };
+    const unique = { meaning: "unique_option", optionId: position === 1 ? "first" : "second", position,
+      label: position === 1 ? "First option" : "Second option", rationale: "The user identifies one current option of the active financing interaction." };
     const independent = { verdict: explicitExtra ? "supported" : "unsupported", rationale: explicitExtra
       ? "The user separately requests inclusion of their owned vehicle."
       : "The ordinal answers only the current financing interaction; the old exchange question was not answered.",
