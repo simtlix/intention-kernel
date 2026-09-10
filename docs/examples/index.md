@@ -1,3 +1,7 @@
+---
+description: Use Intention Kernel in your TypeScript application with examples for agent evaluation, multi-turn conversations, custom assertions, and business rules.
+---
+
 # Application examples
 
 These examples show how to use the installed package from your own application. The evaluation API is called directly; each example supplies definitions or integration code you can adapt to your existing agent.

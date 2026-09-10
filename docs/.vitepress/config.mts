@@ -1,6 +1,7 @@
 import { defineConfig } from "vitepress";
 import process from "node:process";
-import { version } from "../../package.json";
+import { homepage, version } from "../../package.json";
+import { createMetadata } from "./metadata.mts";
 
 const basePath = (process.env.DOCS_BASE ?? "").replace(/^\/+|\/+$/g, "");
 const base = basePath.length > 0 ? `/${basePath}/` : "/";
@@ -101,6 +102,11 @@ export default defineConfig({
   appearance: "dark",
   cleanUrls: false,
   lastUpdated: true,
+  sitemap: {
+    hostname: homepage,
+    transformItems: (items) => items.filter((item) => item.url !== "404.html"),
+  },
+  transformHead: createMetadata,
   head: [
     ["link", { rel: "icon", href: `${base}favicon-32x32.png?v=2`, sizes: "32x32", type: "image/png" }],
     ["link", { rel: "icon", href: `${base}favicon.svg?v=2`, type: "image/svg+xml" }],
@@ -220,7 +226,7 @@ export default defineConfig({
       },
     },
     footer: {
-      message: 'Released under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache License 2.0</a>.',
+      message: 'Created by <a href="https://github.com/claudiojgonzalez">Claudio Gonzales</a> and <a href="https://pailletjp.com">Juan Pablo Paillet</a> (<a href="https://github.com/PailletJuanPablo">GitHub</a>).<br>Released under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache License 2.0</a>.',
       copyright: `Intention Kernel ${version}`,
     },
   },

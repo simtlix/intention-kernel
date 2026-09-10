@@ -1,3 +1,7 @@
+---
+description: Learn how Intention Kernel combines natural-language understanding with explicit execution authority, durable state, and evidence-backed responses.
+---
+
 # Intention Kernel
 
 Intention Kernel is a TypeScript runtime for agents that must combine natural-language understanding with explicit execution authority, durable state, and evidence-backed responses.

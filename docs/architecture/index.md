@@ -1,3 +1,7 @@
+---
+description: Explore how Intention Kernel interprets intentions, authorizes capabilities, coordinates effects, verifies evidence, and commits durable conversation state.
+---
+
 # Execution architecture
 
 Intention Kernel is a capability-first orchestration runtime. The model controls interpretation and language. The kernel controls authority, ordering, durability, and evidence integrity.

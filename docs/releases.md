@@ -1,3 +1,7 @@
+---
+description: Download Intention Kernel releases from GitHub and review the Apache 2.0 license, versioning policy, compatibility guarantees, and release validation.
+---
+
 # Releases and compatibility
 
 Intention Kernel is licensed under Apache-2.0. [GitHub releases](https://github.com/simtlix/intention-kernel/releases) provide versioned

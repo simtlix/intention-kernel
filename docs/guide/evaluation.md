@@ -1,3 +1,7 @@
+---
+description: Evaluate agents with declarative conversation scenarios, acceptance criteria, custom evaluators, and evidence-rich reports using intention-kernel/testing.
+---
+
 # Evaluation framework
 
 Write a conversation as data: the inputs to send, the behavior to accept after each turn, and the conditions that must hold at the end. The evaluation runner executes that definition and produces structured results for every criterion, with the observations needed to investigate failures.

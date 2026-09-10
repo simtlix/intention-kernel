@@ -1,3 +1,7 @@
+---
+description: Define and run your first agent evaluation suite directly from your application using the public intention-kernel/testing API.
+---
+
 # Evaluating from your project
 
 Use `runEvaluation()` from the installed `intention-kernel/testing` package in your application. It accepts a suite and an adapter, executes the scenarios, and returns their results and evidence.

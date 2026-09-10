@@ -1,3 +1,7 @@
+---
+description: Explore the public Intention Kernel runtime and testing APIs for agents, capabilities, adapters, scenario evaluations, assertions, and reports.
+---
+
 # Public API
 
 Only `intention-kernel` and `intention-kernel/testing` are supported import paths. Files under `dist` are implementation details and are blocked by package exports.

@@ -1,3 +1,7 @@
+---
+description: Install Intention Kernel from GitHub, define your first TypeScript agent and capabilities, and run a turn with the public runtime and testing APIs.
+---
+
 # Installation and first agent
 
 Intention Kernel is licensed under Apache-2.0 and distributed through GitHub as installable release tarballs. It is not published to the npm registry.

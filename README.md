@@ -326,6 +326,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development and pull request guidance
 
 See [SECURITY.md](SECURITY.md). The current `0.x` line may change its public contract between minor versions. Once `1.0.0` is released, breaking changes require a new major version.
 
+## Creators
+
+Intention Kernel was created by:
+
+- **Claudio Gonzales** — [GitHub](https://github.com/claudiojgonzalez)
+- **Juan Pablo Paillet** — [Website](https://pailletjp.com) · [GitHub](https://github.com/PailletJuanPablo)
+
 ## License
 
 Licensed under the [Apache License, Version 2.0](LICENSE).
