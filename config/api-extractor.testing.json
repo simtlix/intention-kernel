@@ -1,0 +1,15 @@
+{
+  "extends": "./api-extractor.json",
+  "mainEntryPointFilePath": "<projectFolder>/dist/testing/index.d.ts",
+  "apiReport": {
+    "enabled": true,
+    "reportFileName": "intention-kernel-testing.api.md",
+    "reportFolder": "<projectFolder>/api-reports",
+    "reportTempFolder": "<projectFolder>/.tmp/api-extractor/testing"
+  },
+  "docModel": {
+    "enabled": true,
+    "apiJsonFilePath": "<projectFolder>/.tmp/api-extractor/testing/intention-kernel.api.json"
+  },
+  "tsdocMetadata": { "enabled": false }
+}

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" color="#EDF7F2" role="img" aria-labelledby="title description">
+  <title id="title">Intention Kernel</title>
+  <desc id="description">Three intentions enter a governed kernel and leave as one verified outcome.</desc>
+  <g fill="currentColor">
+    <rect x="18" y="112" width="24" height="24"/>
+    <rect x="50" y="138" width="24" height="24"/>
+    <rect x="18" y="164" width="24" height="24"/>
+    <path d="M86 22 192 92v40h-18v-32l-70-46v192l70-46v-32h18v40L86 278V22Z"/>
+    <path d="M124 147.75h134v4.5H124z"/>
+    <circle cx="258" cy="150" r="17"/>
+  </g>
+</svg>

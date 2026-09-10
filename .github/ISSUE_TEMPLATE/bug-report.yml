@@ -1,0 +1,40 @@
+name: Bug report
+description: Report a reproducible problem with Intention Kernel.
+body:
+  - type: markdown
+    attributes:
+      value: Do not include credentials, personal data, or private provider payloads. Report vulnerabilities using SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      description: Include the release tag or commit when installing from GitHub.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Node.js, npm, TypeScript, and operating system versions.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide code or exact steps that reproduce the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include sanitized errors or relevant events.
+    validations:
+      required: true

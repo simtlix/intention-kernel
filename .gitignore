@@ -1,0 +1,33 @@
+node_modules/
+dist/
+coverage/
+temp/
+tmp/
+.temp/
+.tmp/
+.lh/
+.history/
+.cache/
+
+# Local branding references and archived concepts
+/design/
+
+# Internal implementation plans
+/docs/superpowers/
+
+examples/.runs/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+*.tsbuildinfo
+*.tmp
+*.temp
+*.swp
+*.swo
+*.tgz
+*.log
+.DS_Store
+Thumbs.db
+Desktop.ini
+.env
+.env.*
+!.env.example

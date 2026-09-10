@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "id": "catalogue",
+  "name": "Catalogue conversations",
+  "scenarios": [
+    {
+      "id": "choose-product",
+      "name": "Choose a product from the displayed options",
+      "description": "The chosen product must be the option requested by the user, not just any valid product.",
+      "tags": ["catalogue", "selection"],
+      "writePolicy": "read_only",
+      "steps": [
+        {
+          "id": "search",
+          "input": { "text": "Show available products" },
+          "variants": [
+            { "id": "direct", "input": { "text": "Show available products" } },
+            { "id": "polite", "input": { "text": "Please show available products" } }
+          ],
+          "assertions": [
+            { "id": "response-completed", "kind": "check", "path": ["response", "status"], "operator": "equals", "value": "completed" },
+            { "id": "choice-offered", "kind": "check", "path": ["response", "interaction", "kind"], "operator": "equals", "value": "choice" },
+            { "id": "two-options", "kind": "check", "path": ["response", "interaction", "options"], "operator": "length", "value": 2 }
+          ]
+        },
+        {
+          "id": "select",
+          "input": { "text": "I choose the first product", "selection": { "optionIndex": 0 } },
+          "assertions": [
+            { "id": "selection-persisted", "kind": "check", "path": ["checkpoint", "facts"], "operator": "contains", "value": { "type": "product.selected" } },
+            { "id": "choice-closed", "kind": "check", "path": ["response", "interaction"], "operator": "absent" }
+          ]
+        }
+      ],
+      "assertions": [
+        {
+          "id": "correct-product",
+          "label": "The stored selection matches the requested option from the search turn",
+          "kind": "custom",
+          "evaluator": "catalogue.selected-option",
+          "parameters": { "searchStepId": "search", "selectionStepId": "select" }
+        }
+      ]
+    },
+    {
+      "id": "availability",
+      "name": "Report the available catalogue outcome",
+      "tags": ["catalogue", "alternatives"],
+      "writePolicy": "read_only",
+      "steps": [
+        {
+          "id": "search",
+          "input": { "text": "Show available products" },
+          "variants": [
+            { "id": "available", "input": { "text": "Show available products" } },
+            { "id": "empty", "input": { "text": "Show unavailable products" } }
+          ],
+          "assertions": [
+            { "id": "response-completed", "kind": "check", "path": ["response", "status"], "operator": "equals", "value": "completed" },
+            {
+              "id": "accepted-outcome",
+              "kind": "any",
+              "assertions": [
+                {
+                  "id": "products-offered",
+                  "kind": "all",
+                  "assertions": [
+                    { "id": "has-results", "kind": "check", "path": ["catalogue", "count"], "operator": "gte", "value": 1 },
+                    { "id": "has-choice", "kind": "check", "path": ["response", "interaction", "kind"], "operator": "equals", "value": "choice" }
+                  ]
+                },
+                {
+                  "id": "empty-catalogue-explained",
+                  "kind": "all",
+                  "assertions": [
+                    { "id": "no-results", "kind": "check", "path": ["catalogue", "count"], "operator": "equals", "value": 0 },
+                    { "id": "no-choice", "kind": "check", "path": ["response", "interaction"], "operator": "absent" },
+                    { "id": "reason-published", "kind": "check", "path": ["response", "reason"], "operator": "equals", "value": "no_results" }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "assertions": [
+    { "id": "no-pending-cases", "kind": "check", "path": ["summary", "pending"], "operator": "equals", "value": 0 }
+  ]
+}

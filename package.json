@@ -1,0 +1,89 @@
+{
+  "name": "intention-kernel",
+  "version": "0.8.0",
+  "description": "A capability-first runtime for durable, observable, model-driven agents.",
+  "private": true,
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/simtlix/intention-kernel.git"
+  },
+  "homepage": "https://simtlix.github.io/intention-kernel/",
+  "bugs": {
+    "url": "https://github.com/simtlix/intention-kernel/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": "22.x",
+    "npm": "10.x"
+  },
+  "packageManager": "npm@10.9.8",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "prepare": "npm run build",
+    "prepack": "npm run verify",
+    "clean": "node ./scripts/clean.mjs",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:integration": "vitest run tests/integration",
+    "test:types": "vitest --typecheck.only",
+    "examples:typecheck": "npm run build --silent && tsc -p examples/tsconfig.json --noEmit",
+    "demo:e2e": "npm run build --silent && tsx examples/run.ts",
+    "demo:evaluation": "npm run build --silent && tsx examples/evaluation.ts",
+    "api:report": "api-extractor run --local --config config/api-extractor.json && api-extractor run --local --config config/api-extractor.testing.json",
+    "docs:generate": "node ./scripts/clean-generated-docs.mjs && npm run build --silent && npm run api:report && api-documenter markdown --input .tmp/api-extractor/runtime --output docs/reference && api-documenter markdown --input .tmp/api-extractor/testing --output docs/reference/testing && node ./scripts/normalize-generated-docs.mjs",
+    "docs:verify": "node ./scripts/verify-documentation.mjs",
+    "docs:dev": "vitepress dev docs --host 127.0.0.1",
+    "docs:build": "vitepress build docs && node ./scripts/verify-site.mjs",
+    "docs:preview": "vitepress preview docs --host 127.0.0.1",
+    "docs:check": "npm run docs:generate && npm run docs:verify && npm run docs:build && node ./scripts/check-generated-docs.mjs",
+    "pack:check": "node ./scripts/verify-package.mjs",
+    "release:prepare": "node ./scripts/prepare-release.mjs",
+    "verify": "npm run typecheck && npm run lint && npm test && npm run test:types && npm run examples:typecheck && npm run docs:check && npm run pack:check"
+  },
+  "dependencies": {
+    "@langchain/langgraph": "1.4.13",
+    "zod": "4.5.4"
+  },
+  "overrides": {
+    "js-yaml": "4.3.2",
+    "vite": "6.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@google/genai": "2.21.0",
+    "@microsoft/api-documenter": "7.30.13",
+    "@microsoft/api-extractor": "7.59.0",
+    "@types/node": "22.20.1",
+    "eslint": "10.9.1",
+    "fast-check": "4.9.0",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.69.0",
+    "vitepress": "1.6.4",
+    "vitest": "4.1.11"
+  }
+}
