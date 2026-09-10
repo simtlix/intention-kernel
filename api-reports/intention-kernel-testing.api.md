@@ -281,6 +281,6 @@ export function parseEvaluationSuite(value: unknown): EvaluationSuite;
 export function runEvaluation(options: EvaluationOptions): Promise<EvaluationReport>;
 
 // @public
-export const TESTING_VERSION: "0.8.2";
+export const TESTING_VERSION: "0.8.3";
 
 ```

@@ -2,6 +2,10 @@
 
 All notable changes are documented here. The project follows Semantic Versioning after `1.0.0`; during `0.x`, a minor release may change the public API.
 
+## 0.8.3 - 2026-09-10
+
+- Restrict resolved interpretation capabilities to the exact selected executable contracts in both the generated JSON Schema and runtime validation. Initial and repair requests cannot substitute guidance policy IDs or unrelated agent capabilities. Preserve ambiguous, unsupported and conversational turn boundaries when no operation is selected.
+
 ## 0.8.2 - 2026-09-10
 
 - Bind the visible position, label and opaque ID of a reviewed choice in one schema branch. A model cannot combine the label of one option with another option's ID. Publish the matching choice-review prompt revision for pinned hosts.

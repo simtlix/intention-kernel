@@ -74,7 +74,7 @@ export async function interpretTurn(options: InterpretTurnOptions): Promise<Inte
   }));
   const intentionBatchSchema = createIntentionBatchSchema(
     options.ids ?? { next: () => randomUUID() },
-    selection.capabilityIds.length === 1 ? selection.capabilityIds[0] : undefined,
+    capabilities.map(capability => capability.id),
     options.snapshot.interaction,
     selection.mode,
   );

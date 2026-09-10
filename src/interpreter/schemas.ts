@@ -173,13 +173,22 @@ export function createCapabilitySelectionSchema(
 /** Build the strict model contract while keeping durable intention identifiers under kernel authority. */
 export function createIntentionBatchSchema(
   ids: KernelIdGenerator,
-  soleSelectedCapability?: CapabilityId,
+  selectedCapabilityIds: readonly CapabilityId[],
   interaction?: Interaction,
   mode?: CapabilitySelection["mode"],
 ) {
+  const allowed = [...new Set(selectedCapabilityIds)];
+  const resolvedSchema = allowed.length > 0 ? intentionSchema.options[0].extend({
+    proposedCapability: z.enum(allowed).describe("Exactly one selected executable capability ID. Guidance policy IDs are not capabilities."),
+  }) : undefined;
+  const unresolvedSchema = z.discriminatedUnion("resolution", [intentionSchema.options[1], intentionSchema.options[2]]);
+  const selectedIntentionSchema = resolvedSchema === undefined ? unresolvedSchema
+    : z.discriminatedUnion("resolution", [resolvedSchema, intentionSchema.options[1], intentionSchema.options[2]]);
   const optionIds = interaction?.kind === "choice" ? interaction.options?.map(option => option.id) ?? [] : [];
   const boundedBatchSchema = rawBatchSchema.extend({
-    intentions: z.array(mode === "conversational" ? intentionSchema.options[0] : intentionSchema),
+    intentions: mode === "conversational"
+      ? resolvedSchema === undefined ? z.array(unresolvedSchema).max(0) : z.array(resolvedSchema)
+      : z.array(selectedIntentionSchema),
     lifecycleActions: mode !== undefined && mode !== "control" && mode !== "selected_with_control"
       ? z.array(lifecycleActionSchema).max(0).optional()
       : rawBatchSchema.shape.lifecycleActions,
@@ -199,7 +208,7 @@ export function createIntentionBatchSchema(
     validate: (value) => {
       const parsed = boundedBatchSchema.safeParse(withSoleSelectedCapability(
         withoutModelOwnedIntentionIds(value),
-        soleSelectedCapability,
+        allowed.length === 1 ? allowed[0] : undefined,
       ));
       if (!parsed.success) {
         return {

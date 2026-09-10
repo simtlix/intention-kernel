@@ -1581,6 +1581,49 @@ describe("turn interpretation", () => {
     expect(gateway.requests[0]?.system).toContain("merely resembles capability input");
   });
 
+  it.each([["product.search"], ["product.search", "product.compare"]])("bounds interpretation and repair to the selected contracts: %j", async (...allowed) => {
+    const snapshot = buildContextSnapshot({ compiled: await compiledAgent(), checkpoint: checkpoint(),
+      currentMessage: { role: "user", content: "Find an electric SUV", at: "2026-09-03T10:01:00.000Z" } });
+    const intention = { objective: "Find an electric SUV", evidence: oneSearch.intentions[0]?.evidence ?? [],
+      references: [], proposedCapability: "product.search", input: {}, resolution: "resolved" };
+    const valid = { intentions: [intention], contradictions: [] };
+    const policyAsCapability = { ...valid, intentions: [{ ...intention, proposedCapability: "product.search-scope-boundary" }] };
+    const gateway = new ScriptedGateway(policyAsCapability, valid);
+    const result = await interpretTurn({ snapshot, gateway, selection: selected(...allowed), signal: AbortSignal.timeout(1000) });
+    expect(result.intentions[0]?.proposedCapability).toBe("product.search");
+    expect(gateway.requests.map(request => request.task)).toEqual(["turn.interpret", "turn.interpret.repair"]);
+    for (const request of gateway.requests) {
+      const json = await request.outputSchema.jsonSchema?.();
+      if (!json) throw Error("Missing output schema");
+      const generated = z.fromJSONSchema(json);
+      for (const id of [...allowed, "support.answer", "product.search-scope-boundary"]) {
+        const candidate = { ...valid, intentions: [{ ...intention, proposedCapability: id }] };
+        expect(generated.safeParse(candidate).success, id).toBe(allowed.includes(id));
+        expect((await request.outputSchema.validate(candidate)).ok, id).toBe(allowed.includes(id));
+      }
+      expect(generated.safeParse({ ...valid, intentions: [{ ...intention, resolution: "ambiguous", proposedCapability: null,
+        alternatives: ["search", "compare"] }] }).success).toBe(true);
+    }
+  });
+
+  it("excludes resolved intentions when no contract is selected without preventing unsupported requests", async () => {
+    const snapshot = buildContextSnapshot({ compiled: await compiledAgent(), checkpoint: checkpoint(),
+      currentMessage: { role: "user", content: "An unavailable operation", at: "2026-09-03T10:01:00.000Z" } });
+    const intention = { objective: "An unavailable operation", evidence: oneSearch.intentions[0]?.evidence ?? [],
+      references: [], resolution: "resolved" };
+    const valid = { intentions: [{ ...intention, resolution: "unsupported" }], contradictions: [] };
+    const gateway = new ScriptedGateway(oneSearch, valid);
+    await interpretTurn({ snapshot, gateway, selection: { ...noMatch, mode: "no_match" }, signal: AbortSignal.timeout(1000) });
+    for (const request of gateway.requests) {
+      const json = await request.outputSchema.jsonSchema?.();
+      if (!json) throw Error("Missing output schema");
+      const candidate = { ...valid, intentions: [{ ...intention, proposedCapability: "product.search" }] };
+      expect(z.fromJSONSchema(json).safeParse(candidate).success).toBe(false);
+      expect(z.fromJSONSchema(json).safeParse(valid).success).toBe(true);
+      expect((await request.outputSchema.validate(candidate)).ok).toBe(false);
+    }
+  });
+
   it("exposes conversational and lifecycle boundaries in the generation contract", async () => {
     const compiled = await compiledAgent();
     const snapshot = buildContextSnapshot({ compiled, checkpoint: checkpoint({ interaction: {
