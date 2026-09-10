@@ -28,30 +28,24 @@ const referenceSchema = z.strictObject({
   target: z.string().min(1).describe("Exactly one target identifier from the supplied context. Never combine multiple identifiers."),
   evidence: z.string().min(1),
 });
-const intentionSchema = z
-  .strictObject({
+const intentionFields = {
     objective: z.string().min(1),
     rationale: z.string().min(1).max(1200).describe("Brief decision justification based on the cited evidence and canonical context, not private chain-of-thought.").optional(),
     evidence: z.array(evidenceSchema).min(1),
     references: z.array(referenceSchema),
-    proposedCapability: stableId
-      .describe("Required for a resolved intention. Use exactly one capability identifier from the selected contract set.")
-      .nullish(),
     input: z.unknown().nullish(),
-    resolution: z.enum(["resolved", "ambiguous", "unsupported"]),
     alternatives: z.array(z.string().min(1)).nullish(),
-  })
-  .superRefine((value, context) => {
-    if (value.resolution === "resolved" && value.proposedCapability == null) {
-      context.addIssue({ code: "custom", message: "A resolved intention requires proposedCapability.", path: ["proposedCapability"] });
-    }
-    if (value.resolution !== "resolved" && value.proposedCapability != null) {
-      context.addIssue({ code: "custom", message: "Only a resolved intention may propose a capability.", path: ["proposedCapability"] });
-    }
-    if (value.resolution === "ambiguous" && (value.alternatives?.length ?? 0) < 2) {
-      context.addIssue({ code: "custom", message: "An ambiguous intention requires at least two alternatives.", path: ["alternatives"] });
-    }
-  });
+};
+// Structural branches survive JSON Schema projection; superRefine does not.
+// Generation and runtime validation must express the same resolution contract.
+const intentionSchema = z.discriminatedUnion("resolution", [
+  z.strictObject({ ...intentionFields, resolution: z.literal("resolved"),
+    proposedCapability: stableId.describe("Use exactly one capability identifier from the selected contract set.") }),
+  z.strictObject({ ...intentionFields, resolution: z.literal("ambiguous"),
+    proposedCapability: z.null().optional(), alternatives: z.array(z.string().min(1)).min(2) }),
+  z.strictObject({ ...intentionFields, resolution: z.literal("unsupported"),
+    proposedCapability: z.null().optional() }),
+]);
 const answerSchema = z.strictObject({
   interactionId: z.string().min(1),
   value: z.unknown(),
@@ -104,6 +98,14 @@ const capabilitySelectionEvidenceSchema = z.strictObject({
 
 /** Compact semantic routing result produced before parameter interpretation. */
 export interface CapabilitySelection {
+  /** Kernel-bound result of the current choice review; never accepted from routing model output. */
+  readonly reviewedChoice?: Readonly<{
+    interactionId: string;
+    optionId: string;
+    messageIndex: number;
+    evidence: string;
+    rationale: string;
+  }>;
   /** Internal provenance; never accepted from the model output schema. */
   readonly source?: "model" | "kernel_boundary";
   /** Kernel-added contract availability, kept separate from the model rationale. */

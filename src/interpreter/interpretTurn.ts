@@ -41,6 +41,19 @@ export interface InterpretTurnOptions {
 /** Interpret a turn and permit at most one repair of malformed structured output. */
 export async function interpretTurn(options: InterpretTurnOptions): Promise<IntentionBatch> {
   const selection = options.selection ?? await selectCapabilities(options);
+  const reviewedAnswer = bindReviewedChoice(selection, options.snapshot);
+  if (options.validatedInteractionAnswer === undefined && reviewedAnswer !== undefined) {
+    options = { ...options, validatedInteractionAnswer: reviewedAnswer };
+  }
+  const collection = resolveInteractionAnswerOwner(options.snapshot, reviewedAnswer);
+  // A bound answer to one durable collector is a continuation, not a new operation.
+  // Keep interpreting cross-owner selections, lifecycle requests and additional work.
+  if (reviewedAnswer !== undefined && collection?.pending !== undefined &&
+    selection.mode === "selected" && selection.capabilityIds.length === 1 &&
+    selection.capabilityIds[0] === collection.capabilityId &&
+    (options.validatedInteractionAnswer === undefined || isDeepStrictEqual(options.validatedInteractionAnswer, reviewedAnswer))) {
+    return { intentions: [], contradictions: [], answerToInteraction: reviewedAnswer };
+  }
   if (selection.mode === "conversational" && options.snapshot.interaction === undefined) {
     return { intentions: [], contradictions: [] };
   }
@@ -155,6 +168,20 @@ export async function interpretTurn(options: InterpretTurnOptions): Promise<Inte
     retryable: false,
     context: { task: "turn.interpret", attempts: 2, issues: JSON.stringify(repairedIssues) },
   });
+}
+
+/** Bind only a review of this exact message and current server-owned choice. */
+function bindReviewedChoice(selection: CapabilitySelection, snapshot: ContextSnapshot): IntentionBatch["answerToInteraction"] {
+  const reviewed = selection.reviewedChoice;
+  if (reviewed === undefined) return undefined;
+  const interaction = snapshot.interaction;
+  const matches = interaction?.options?.filter(option => option.id === reviewed.optionId) ?? [];
+  const option = matches[0];
+  if (interaction?.kind !== "choice" || interaction.id !== reviewed.interactionId || matches.length !== 1 || option === undefined ||
+    snapshot.currentMessage.index !== reviewed.messageIndex || snapshot.currentMessage.content !== reviewed.evidence) {
+    throw new ModelGatewayError({ code: "CAPABILITY_SELECTION_INVALID", message: "Choice review does not bind the current message and interaction.", retryable: false });
+  }
+  return { interactionId: interaction.id, value: structuredClone(option.value), evidence: reviewed.evidence, rationale: reviewed.rationale };
 }
 
 function withValidatedAnswer(batch: IntentionBatch, options: InterpretTurnOptions): IntentionBatch {

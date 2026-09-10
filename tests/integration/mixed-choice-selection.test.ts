@@ -41,7 +41,7 @@ describe("active choice with additional capability selection", () => {
       },
     } });
     const proposed = { mode: "selected", capabilityIds: [activeId, extraId], rationale: "Selection and prior pending decision", evidence };
-    const unique = { meaning: "unique_option", rationale: "The user identifies one current option of the active financing interaction." };
+    const unique = { meaning: "unique_option", optionId: position === 1 ? "first" : "second", rationale: "The user identifies one current option of the active financing interaction." };
     const independent = { verdict: explicitExtra ? "supported" : "unsupported", rationale: explicitExtra
       ? "The user separately requests inclusion of their owned vehicle."
       : "The ordinal answers only the current financing interaction; the old exchange question was not answered.",
@@ -49,9 +49,8 @@ describe("active choice with additional capability selection", () => {
     const selectedValue = position === 1 ? "first" : "second";
     const answerToInteraction = { interactionId: "finance-options", value: selectedValue, evidence: message };
     const intentions = [activeId, extraId].map(proposedCapability => ({ proposedCapability, objective: proposedCapability, input: { request: message }, resolution: "resolved", evidence, references: [] }));
-    const supportedChoice = { decision: "selected", optionId: selectedValue, rationale: "Exact current option identified by its position." };
-    const gateway = new Gateway([proposed, unique, { intentions, contradictions: [], answerToInteraction }, supportedChoice, independent,
-      ...(explicitExtra ? [] : [{ intentions: [intentions[0]], contradictions: [], answerToInteraction }, supportedChoice])]);
+    const gateway = new Gateway([proposed, unique, { intentions, contradictions: [], answerToInteraction }, independent,
+      ...(explicitExtra ? [] : [{ intentions: [intentions[0]], contradictions: [], answerToInteraction }])]);
     const result = await selectCapabilities({ snapshot, gateway, signal: AbortSignal.timeout(1_000) });
     expect(result.capabilityIds).toEqual([activeId, extraId]);
     const batch = await interpretTurn({ snapshot, compiled, selection: result, gateway, signal: AbortSignal.timeout(1_000) });
@@ -60,8 +59,8 @@ describe("active choice with additional capability selection", () => {
     expect(plan.steps[0]?.input).toEqual({ request: message });
     expect(batch.answerToInteraction?.value).toBe(selectedValue);
     expect(gateway.requests.map((request) => request.task)).toEqual(explicitExtra
-      ? ["capability.select", "capability-selection.choice-review", "turn.interpret", "interaction-answer.review", "interaction-answer.review"]
-      : ["capability.select", "capability-selection.choice-review", "turn.interpret", "interaction-answer.review", "interaction-answer.review", "turn.interpret.repair", "interaction-answer.review"]);
+      ? ["capability.select", "capability-selection.choice-review", "turn.interpret", "interaction-answer.review"]
+      : ["capability.select", "capability-selection.choice-review", "turn.interpret", "interaction-answer.review", "turn.interpret.repair"]);
     expect(snapshot.agenda[0]?.id).toBe("old-exchange");
     expect(snapshot.interaction?.id).toBe("finance-options");
   });

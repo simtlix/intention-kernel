@@ -74,7 +74,7 @@ async function fixture(options: FixtureOptions) {
     else if (request.task === "turn.interpret") value = proposal(options.initial);
     else if (request.task === "turn.interpret.repair") value = options.numeric?.reject || options.numeric?.referenceExamples?.includes("2")
       ? { intentions: [], contradictions: [] } : proposal(options.repaired ?? options.initial);
-    else if (request.task === "capability-selection.choice-review") value = { meaning: "unique_option", rationale: "The detailed interpretation must evaluate the proposed current option." };
+    else if (request.task === "capability-selection.choice-review") value = { meaning: "operation_request", operationCapabilityIds: [owner], rationale: "The owner operation is shortlisted; detailed interpretation and answer review must evaluate its proposed option." };
     else if ((request.input as { proposedOption?: unknown }).proposedOption !== undefined) {
       value = options.numeric?.reject
         ? { decision: "not_selection", rationale: "The current words do not commit to an option." }

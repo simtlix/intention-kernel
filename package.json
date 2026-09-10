@@ -1,6 +1,6 @@
 {
   "name": "intention-kernel",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "A capability-first runtime for durable, observable, model-driven agents.",
   "private": true,
   "license": "Apache-2.0",

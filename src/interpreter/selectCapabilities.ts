@@ -3,6 +3,7 @@ import { ModelGatewayError } from "../contracts/errors.js";
 import type { ModelCapabilitySummary, ModelGateway, ModelRequest } from "../contracts/model.js";
 import type { ContextSnapshot } from "../context/buildContextSnapshot.js";
 import { projectModelContext } from "../context/projectModelContext.js";
+import type { InterpretationIssue } from "./reviewLifecycleActions.js";
 import { reviewLifecycleSelection } from "./reviewLifecycleActions.js";
 import { defersOrdinaryChoiceExtras } from "./reviewChoiceIntentions.js";
 import {
@@ -50,15 +51,16 @@ export async function selectCapabilities(
   const initialSelection = initialValidation.ok
     ? retainInteractionContracts(initialValidation.value, options.snapshot)
     : undefined;
-  const initialIssues = initialValidation.ok
+  const initialReview: Awaited<ReturnType<typeof selectionIssues>> = initialValidation.ok
     ? await selectionIssues({
         selection: initialSelection as CapabilitySelection,
         snapshot: options.snapshot,
         gateway: options.gateway,
         signal: options.signal,
       })
-    : initialValidation.issues;
-  if (initialSelection !== undefined && initialIssues.length === 0) return initialSelection;
+    : { issues: initialValidation.issues };
+  const initialIssues = initialReview.issues;
+  if (initialSelection !== undefined && initialIssues.length === 0) return { ...initialSelection, ...(initialReview.reviewedChoice === undefined ? {} : { reviewedChoice: initialReview.reviewedChoice }) };
 
   const repairModel = options.snapshot.agent.modelPolicy["capability.select.repair"] ?? model;
   const repairRequest: ModelRequest<CapabilitySelection> = {
@@ -77,15 +79,16 @@ export async function selectCapabilities(
   const repairedSelection = repairedValidation.ok
     ? retainInteractionContracts(repairedValidation.value, options.snapshot)
     : undefined;
-  const repairedIssues = repairedValidation.ok
+  const repairedReview: Awaited<ReturnType<typeof selectionIssues>> = repairedValidation.ok
     ? await selectionIssues({
         selection: repairedSelection as CapabilitySelection,
         snapshot: options.snapshot,
         gateway: options.gateway,
         signal: options.signal,
       })
-    : repairedValidation.issues;
-  if (repairedSelection !== undefined && repairedIssues.length === 0) return repairedSelection;
+    : { issues: repairedValidation.issues };
+  const repairedIssues = repairedReview.issues;
+  if (repairedSelection !== undefined && repairedIssues.length === 0) return { ...repairedSelection, ...(repairedReview.reviewedChoice === undefined ? {} : { reviewedChoice: repairedReview.reviewedChoice }) };
   if (
     unboundScalarSelection(options.snapshot) ||
     (repairedSelection !== undefined && (
@@ -160,7 +163,7 @@ async function selectionIssues(options: {
   readonly snapshot: ContextSnapshot;
   readonly gateway: ModelGateway;
   readonly signal: AbortSignal;
-}) {
+}): Promise<{ readonly issues: readonly InterpretationIssue[]; readonly reviewedChoice?: NonNullable<CapabilitySelection["reviewedChoice"]> }> {
   const boundary = unboundScalarSelection(options.snapshot) &&
     (options.selection.mode === "selected" || options.selection.mode === "selected_with_control")
     ? [{
@@ -168,17 +171,18 @@ async function selectionIssues(options: {
         path: ["mode"],
       }]
     : [];
-  if (boundary.length > 0) return boundary;
+  if (boundary.length > 0) return { issues: boundary };
   const unboundIssues = await reviewUnboundCapabilitySelection(options);
-  if (unboundIssues.length > 0) return unboundIssues;
-  const choiceIssues = await reviewChoiceCapabilitySelection(options);
-  if (choiceIssues.length > 0) return choiceIssues;
+  if (unboundIssues.length > 0) return { issues: unboundIssues };
+  const choiceReview = await reviewChoiceCapabilitySelection(options);
+  if (choiceReview.issues.length > 0) return choiceReview;
   // A mixed ordinary-choice shortlist exposes contracts, not operation consent.
   // Interpretation reviews the actual extras, including batches without an answer.
   const interactionIssues = defersOrdinaryChoiceExtras(options.snapshot, options.selection)
     ? [] : await reviewActiveInteractionDiversion(options);
-  if (interactionIssues.length > 0) return interactionIssues;
-  return reviewLifecycleSelection(options);
+  if (interactionIssues.length > 0) return { issues: interactionIssues };
+  const issues = await reviewLifecycleSelection(options);
+  return { ...choiceReview, issues };
 }
 
 function unboundScalarSelection(snapshot: ContextSnapshot): boolean {

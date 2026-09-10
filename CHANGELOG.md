@@ -2,6 +2,12 @@
 
 All notable changes are documented here. The project follows Semantic Versioning after `1.0.0`; during `0.x`, a minor release may change the public API.
 
+## 0.8.1 - 2026-09-10
+
+- Encode resolution-specific intention requirements in the generated JSON Schema as well as runtime validation: resolved intentions require a capability, ambiguous intentions require alternatives, and unresolved intentions cannot propose operations. Initial and repair requests share the same contract.
+- Bind unique free-text choice reviews to the exact current option and preserve that binding through interpretation and repair. Reject stale interaction, page and message bindings; keep independent-operation reviews.
+- Include the reviewed choice in capability-selection trace events. The internal choice-review response now requires a current optionId; hosts with pinned prompts should publish the matching choice-review prompt revision.
+
 ## 0.8.0
 
 - Expose versioned model prompt definitions through `getKernelPromptDefinitions`, exact interpolation through `renderModelPrompt`, and pinned host revisions through `ModelPromptResolver`. Model requests carry their prompt contract and execution values.

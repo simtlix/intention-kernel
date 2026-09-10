@@ -106,6 +106,7 @@ export function createRuntimeNodes(dependencies: RuntimeNodeDependencies) {
         capabilityIds: capabilitySelection.capabilityIds,
         rationale: capabilitySelection.rationale,
         evidence: capabilitySelection.evidence,
+        reviewedChoice: capabilitySelection.reviewedChoice ?? null,
         adjustments: capabilitySelection.adjustments ?? [],
       }, {
         category: "audit",

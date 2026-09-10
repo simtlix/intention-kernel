@@ -36,10 +36,10 @@ export interface ReviewUnboundSelectionOptions {
   readonly signal: AbortSignal;
 }
 
-function createChoiceReviewSchema(registeredCapabilityIds: readonly string[]) {
+function createChoiceReviewSchema(registeredCapabilityIds: readonly string[], optionIds: readonly string[]) {
   const rationale = z.string().min(1);
   const choiceReviewShape = z.discriminatedUnion("meaning", [
-    z.strictObject({ meaning: z.literal("unique_option"), rationale }),
+    z.strictObject({ meaning: z.literal("unique_option"), optionId: z.enum(optionIds), rationale }),
     z.strictObject({ meaning: z.literal("ambiguous_or_unrelated"), rationale }),
     z.strictObject({ meaning: z.literal("operation_request"), rationale,
       operationCapabilityIds: z.array(z.enum(registeredCapabilityIds)).min(1).max(registeredCapabilityIds.length)
@@ -94,23 +94,30 @@ export async function reviewUnboundCapabilitySelection(
 }
 
 /** Verify a unique choice or an independent operational request without assuming an arbitrary option. */
+interface ChoiceSelectionReview {
+  readonly issues: readonly InterpretationIssue[];
+  readonly reviewedChoice?: NonNullable<CapabilitySelection["reviewedChoice"]>;
+}
+
 export async function reviewChoiceCapabilitySelection(
   options: ReviewUnboundSelectionOptions,
-): Promise<readonly InterpretationIssue[]> {
-  if (!requiresChoiceSelectionReview(options.snapshot, options.selection)) return [];
+): Promise<ChoiceSelectionReview> {
+  if (!requiresChoiceSelectionReview(options.snapshot, options.selection)) return { issues: [] };
+  const interaction = options.snapshot.interaction;
+  if (interaction === undefined) return { issues: [] };
   if (conflictingChoiceReferences(options.snapshot.interaction, options.snapshot.currentMessage.content)) {
-    return [{
+    return { issues: [{
       message: "The exact current reference matches a registered example of one option and the display position of a different option. Use mode conversational with no capability IDs and preserve the pending choice for clarification; neither option is authorized.",
       path: ["mode"],
-    }];
+    }] };
   }
   const model = options.snapshot.agent.modelPolicy["capability-selection.review"] ??
     options.snapshot.agent.modelPolicy["capability.select"] ??
     options.snapshot.agent.modelPolicy["turn.interpret"];
   const context = projectModelContext(options.snapshot);
   const registeredCapabilityIds = [...new Set(options.snapshot.capabilities.map(capability => capability.id))];
-  if (registeredCapabilityIds.length === 0) return [{ message: "Choice operation review requires registered capability contracts.", path: ["capabilityIds"] }];
-  const choiceReviewSchema = createChoiceReviewSchema(registeredCapabilityIds);
+  if (registeredCapabilityIds.length === 0) return { issues: [{ message: "Choice operation review requires registered capability contracts.", path: ["capabilityIds"] }] };
+  const choiceReviewSchema = createChoiceReviewSchema(registeredCapabilityIds, (context.interaction?.options ?? []).map(option => option.id));
   const request = {
     task: "capability-selection.choice-review",
     ...(model === undefined ? {} : { model }),
@@ -129,25 +136,32 @@ export async function reviewChoiceCapabilitySelection(
   const result = await options.gateway.invoke(request);
   const validation = await choiceReviewSchema.validate(result.value);
   if (!validation.ok) {
-    return validation.issues.map((issue) => ({
+    return { issues: validation.issues.map((issue) => ({
       message: `Choice capability selection review output was invalid: ${issue.message}`,
       path: ["mode"],
-    }));
+    })) };
   }
   if (validation.value.meaning === "operation_request") {
     const missing = validation.value.operationCapabilityIds.filter(id => !options.selection.capabilityIds.some(selected => selected === id));
-    if (missing.length > 0) return [{
+    if (missing.length > 0) return { issues: [{
       message: `The reviewed current operation is not represented by the proposed capability set: ${missing.join(", ")}. Re-evaluate selection against the current message and registered contracts. Do not substitute the current option-selection capability for a refinement or a different requested operation. Reviewer bindings do not authorize execution or automatic additions to the shortlist.`,
       path: ["capabilityIds"],
-    }];
-    return [];
+    }] };
+    return { issues: [] };
   }
-  return validation.value.meaning !== "ambiguous_or_unrelated"
-    ? []
-    : [{
-        message: `The active multi-option interaction does not uniquely support the selected capability: ${validation.value.rationale}. If there is no independent operational request, use mode conversational with no capability IDs to preserve the interaction. Do not turn an unanswered question into a new request for its owner capability.`,
-        path: ["mode"],
-      }];
+  if (validation.value.meaning === "unique_option") {
+    return { issues: [], reviewedChoice: {
+      interactionId: interaction.id,
+      optionId: validation.value.optionId,
+      messageIndex: options.snapshot.currentMessage.index,
+      evidence: options.snapshot.currentMessage.content,
+      rationale: validation.value.rationale,
+    } };
+  }
+  return { issues: [{
+    message: `The active multi-option interaction does not uniquely support the selected capability: ${validation.value.rationale}. If there is no independent operational request, use mode conversational with no capability IDs to preserve the interaction. Do not turn an unanswered question into a new request for its owner capability.`,
+    path: ["mode"],
+  }] };
 }
 
 /** Verify that leaving an active interaction is supported by a distinct current request. */

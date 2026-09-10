@@ -3,6 +3,8 @@ import { agentId, capabilityId, defineAgent, defineCapability, defineSchema } fr
 import { compileAgentDefinition } from "../../src/compiler/compileAgentDefinition.js";
 import { buildContextSnapshot } from "../../src/context/buildContextSnapshot.js";
 import { selectCapabilities } from "../../src/interpreter/selectCapabilities.js";
+import { interpretTurn } from "../../src/interpreter/interpretTurn.js";
+import { createTurnPlan } from "../../src/planner/createTurnPlan.js";
 import { reviewChoiceCapabilitySelection } from "../../src/interpreter/reviewCapabilitySelection.js";
 import type { ModelGateway, ModelRequest, ModelResult } from "../../src/contracts/model.js";
 
@@ -33,10 +35,76 @@ async function fixture(text = "AT") {
       options: [{ id: "first", label: "First automatic product", targetCapabilityId: selectId, value: "first" }, { id: "second", label: "Second automatic product", targetCapabilityId: selectId, value: "second" }] },
   } });
   const selection = { mode: "selected" as const, capabilityIds: [selectId], rationale: "Possible current selection", evidence: [{ text, meaning: "Current request", messageIndex: 0 }] };
-  return { snapshot, selection };
+  return { snapshot, selection, compiled };
 }
 
 describe("choice operation review binds requested operations to the proposed capability set", () => {
+  it("resumes the sole durable collector with its original input without another interpretation call", async () => {
+    const current = await fixture("2");
+    const snapshot = { ...current.snapshot,
+      interaction: { ...current.snapshot.interaction, id: "products" as never, kind: "choice" as const, capabilityId: selectId,
+        goal: "Choose product", requestedFacts: [], options: current.snapshot.interaction?.options ?? [] },
+      agenda: [{ id: "pending-collector" as never, status: "waiting_input" as const, dependencies: [], missingFacts: [],
+        intention: { id: "durable-intention" as never, objective: "Original operation", proposedCapability: selectId,
+          input: { original: "preserved" }, resolution: "resolved" as const, references: [], evidence: current.selection.evidence } }],
+    };
+    const gateway = new Gateway([current.selection, { meaning: "unique_option", optionId: "second", rationale: "Current second option." }]);
+    const selection = await selectCapabilities({ snapshot, gateway, signal });
+    const batch = await interpretTurn({ ...current, snapshot, selection, gateway, signal });
+    const plan = await createTurnPlan({ batch, snapshot, compiled: current.compiled, ids: { next: kind => kind } });
+    expect(batch.intentions).toEqual([]);
+    expect(batch.answerToInteraction?.value).toBe("second");
+    expect(plan.steps).toHaveLength(1);
+    expect(plan.steps[0]?.input).toEqual({ original: "preserved" });
+    expect(plan.steps[0]?.interactionAnswer?.value).toBe("second");
+    expect(gateway.requests.map(r => r.task)).toEqual(["capability.select", "capability-selection.choice-review"]);
+  });
+  it.each(["2", "la segunda"])("preserves the reviewed option for %s when interpretation repeats an earlier request", async text => {
+    const current = await fixture(text);
+    const gateway = new Gateway([current.selection,
+      { meaning: "unique_option", optionId: "second", rationale: "The current positional reference selects the second product." },
+      { intentions: [{ objective: "Earlier search", proposedCapability: selectId, resolution: "resolved", references: [], input: { request: "previous message" }, evidence: current.selection.evidence }], contradictions: [] },
+    ]);
+    const selection = await selectCapabilities({ snapshot: current.snapshot, gateway, signal });
+    const batch = await interpretTurn({ ...current, selection, gateway, signal });
+    expect(batch.answerToInteraction).toMatchObject({ interactionId: "products", value: "second", evidence: text });
+    expect(gateway.requests.map(r => r.task)).toEqual(["capability.select", "capability-selection.choice-review", "turn.interpret"]);
+  });
+
+  it.each([undefined, "old-page-option"])("rejects a unique option without a current binding: %s", async optionId => {
+    const current = await fixture("2");
+    const gateway = new Gateway([{ meaning: "unique_option", ...(optionId === undefined ? {} : { optionId }), rationale: "Unbound choice." }]);
+    expect((await reviewChoiceCapabilitySelection({ ...current, gateway, signal })).issues.length).toBeGreaterThan(0);
+  });
+
+  it("preserves the reviewed answer through repair even if the interpreter proposes a different option", async () => {
+    const current = await fixture("la segunda");
+    const intention = { objective: "Choose product", proposedCapability: selectId, resolution: "resolved", references: [], input: {}, evidence: current.selection.evidence };
+    const gateway = new Gateway([current.selection,
+      { meaning: "unique_option", optionId: "second", rationale: "The current second option is selected." },
+      { intentions: [{ ...intention, resolution: "invalid" }], contradictions: [] },
+      { intentions: [intention], contradictions: [], answerToInteraction: { interactionId: "products", value: "first", evidence: "earlier message" } },
+    ]);
+    const selection = await selectCapabilities({ snapshot: current.snapshot, gateway, signal });
+    const batch = await interpretTurn({ ...current, selection, gateway, signal });
+    expect(batch.answerToInteraction).toMatchObject({ value: "second", evidence: "la segunda" });
+    expect(gateway.requests.map(r => r.task)).toEqual(["capability.select", "capability-selection.choice-review", "turn.interpret", "turn.interpret.repair"]);
+  });
+
+  it.each(["message", "interaction", "page"])("does not reuse a choice review after the %s changes", async change => {
+    const current = await fixture("2");
+    const gateway = new Gateway([current.selection, { meaning: "unique_option", optionId: "second", rationale: "Current second option." }]);
+    const selection = await selectCapabilities({ snapshot: current.snapshot, gateway, signal });
+    const interaction = current.snapshot.interaction;
+    if (interaction === undefined) throw Error("Fixture interaction is required");
+    const snapshot = { ...current.snapshot,
+      ...(change === "message" ? { currentMessage: { ...current.snapshot.currentMessage, content: "another request" } } : {}),
+      ...(change === "interaction" ? { interaction: { ...interaction, id: "new-choice" as never } } : {}),
+      ...(change === "page" ? { interaction: { ...interaction, options: [{ id: "new-page-option", label: "New option", value: "new" }] } } : {}),
+    };
+    await expect(interpretTurn({ ...current, snapshot, selection, gateway, signal })).rejects.toMatchObject({ code: "CAPABILITY_SELECTION_INVALID" });
+    expect(gateway.requests).toHaveLength(2);
+  });
   it("repairs the AT shortlist to search when the reviewed operation is not selection", async () => {
     const current = await fixture();
     const gateway = new Gateway([current.selection,
@@ -59,14 +127,14 @@ describe("choice operation review binds requested operations to the proposed cap
   ])("rejects missing, empty, unknown or duplicated bindings: %j", async value => {
     const current = await fixture();
     const gateway = new Gateway([value]);
-    expect(await reviewChoiceCapabilitySelection({ ...current, gateway, signal })).not.toEqual([]);
+    expect((await reviewChoiceCapabilitySelection({ ...current, gateway, signal })).issues).not.toEqual([]);
     expect(gateway.requests).toHaveLength(1);
   });
 
   it("accepts a supported operation only when its registered ID is already shortlisted", async () => {
     const current = await fixture("Quiero elegir la primera");
     const gateway = new Gateway([{ meaning: "operation_request", operationCapabilityIds: [selectId], rationale: "An explicit request to choose a product is covered by product.select." }]);
-    expect(await reviewChoiceCapabilitySelection({ ...current, gateway, signal })).toEqual([]);
+    expect((await reviewChoiceCapabilitySelection({ ...current, gateway, signal })).issues).toEqual([]);
   });
 
   it("retains a compound shortlist without giving the reviewer execution authority over extras", async () => {
@@ -90,8 +158,8 @@ describe("choice operation review binds requested operations to the proposed cap
 
   it.each(["unique_option", "ambiguous_or_unrelated"])("preserves the existing %s branch without inventing operation bindings", async meaning => {
     const current = await fixture();
-    const gateway = new Gateway([{ meaning, rationale: "Current option reference decision." }]);
-    const issues = await reviewChoiceCapabilitySelection({ ...current, gateway, signal });
+    const gateway = new Gateway([{ meaning, ...(meaning === "unique_option" ? { optionId: "first" } : {}), rationale: "Current option reference decision." }]);
+    const { issues } = await reviewChoiceCapabilitySelection({ ...current, gateway, signal });
     expect(issues.length === 0).toBe(meaning === "unique_option");
   });
 });

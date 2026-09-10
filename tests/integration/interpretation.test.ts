@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   agentId,
@@ -762,6 +763,39 @@ describe("turn interpretation", () => {
     ]);
   });
 
+  it("requires resolved capability identity in generation and repair with multiple selected contracts", async () => {
+    const snapshot = buildContextSnapshot({ checkpoint: checkpoint(),
+      currentMessage: { role: "user", content: "Show electric SUVs", at: "2026-09-03T10:01:00.000Z" },
+      compiled: await compiledAgent() });
+    const original = oneSearch.intentions[0];
+    if (original === undefined) throw Error("Missing fixture intention");
+    const base = { objective: original.objective, evidence: original.evidence,
+      references: original.references, input: original.input, resolution: original.resolution };
+    const omitted = { intentions: [base], contradictions: [] };
+    const valid = { intentions: [{ ...base, proposedCapability: "product.search" }], contradictions: [] };
+    const gateway = new ScriptedGateway(selected("product.search", "product.compare"), omitted, valid);
+    const result = await interpretTurn({ snapshot, gateway, signal: AbortSignal.timeout(1_000) });
+    expect(result.intentions[0]?.proposedCapability).toBe("product.search");
+    const requests = gateway.requests.filter(request => request.task.startsWith("turn.interpret"));
+    expect(requests.map(request => request.task)).toEqual(["turn.interpret", "turn.interpret.repair"]);
+    for (const request of requests) {
+      const jsonSchema = await request.outputSchema.jsonSchema?.();
+      if (jsonSchema === undefined) throw Error("Missing generation schema");
+      const generated = z.fromJSONSchema(jsonSchema);
+      expect(generated.safeParse(omitted).success).toBe(false);
+      expect(generated.safeParse({ ...valid, intentions: [{ ...base, proposedCapability: null }] }).success).toBe(false);
+      expect(generated.safeParse(valid).success).toBe(true);
+      for (const intention of [
+        { ...base, resolution: "unsupported" },
+        { ...base, resolution: "ambiguous", alternatives: ["search", "compare"] },
+      ]) {
+        const batch = { intentions: [intention], contradictions: [] };
+        expect(generated.safeParse(batch).success).toBe(true);
+        expect((await request.outputSchema.validate(batch)).ok).toBe(true);
+      }
+    }
+  });
+
   it("repairs a reference that combines multiple active option identifiers", async () => {
     const compiled = await compileAgentDefinition(defineAgent({
       id: agentId("reference.agent"),
@@ -852,9 +886,11 @@ describe("turn interpretation", () => {
     });
     expect(result.intentions[0]?.id).not.toBe("request.1");
     const interpretationJsonSchema = await gateway.requests[1]?.outputSchema.jsonSchema?.() as {
-      properties?: { intentions?: { items?: { properties?: Record<string, unknown> } } };
+      properties?: { intentions?: { items?: { oneOf?: { properties: Record<string, unknown> }[] } } };
     };
-    expect(interpretationJsonSchema.properties?.intentions?.items?.properties).not.toHaveProperty("id");
+    const branches = interpretationJsonSchema.properties?.intentions?.items?.oneOf;
+    expect(branches).toHaveLength(3);
+    for (const branch of branches ?? []) expect(branch.properties).not.toHaveProperty("id");
     expect(gateway.requests[0]?.input).toMatchObject({
       currentMessage: { content: "Show electric SUVs" },
       conversation: { totalMessages: 3 },
