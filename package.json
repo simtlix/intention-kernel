@@ -65,7 +65,7 @@
     "verify": "npm run typecheck && npm run lint && npm test && npm run test:types && npm run examples:typecheck && npm run docs:check && npm run pack:check"
   },
   "dependencies": {
-    "@langchain/langgraph": "1.4.13",
+    "@langchain/langgraph": "1.4.14",
     "zod": "4.5.4"
   },
   "overrides": {
