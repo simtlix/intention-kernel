@@ -224,13 +224,24 @@ function validateProgression(
         throw progressionError("INVALID_PROGRESSION_GROUP_MEMBER", "Progression members must be unique registered capabilities with automatic input.", member.capabilityId);
       }
       members.add(member.capabilityId);
+      const condition = member.availableWhen;
+      if (condition !== undefined && (
+        typeof group.filteredPrompt !== "string" || group.filteredPrompt.trim().length === 0 ||
+        typeof condition.equals !== "boolean" || !Array.isArray(condition.path) || condition.path.length === 0 ||
+        condition.path.some((key) => typeof key !== "string" || key.trim().length === 0 || ["__proto__", "constructor", "prototype"].includes(key)) ||
+        !dependencyGraph.providersByFact.has(factKey(condition.fact))
+      )) {
+        throw progressionError("INVALID_PROGRESSION_MEMBER_AVAILABILITY", "Conditional members require a provided fact, a safe field path, a boolean and a filtered prompt.", member.capabilityId);
+      }
     }
   }
   const ruleIds = new Set<string>();
   for (const rule of progression.rules) {
     if (rule.id.trim().length === 0 || ruleIds.has(rule.id) || !Number.isInteger(rule.version) || rule.version < 1 ||
-      !Number.isInteger(rule.priority) || rule.priority < 0) {
-      throw progressionError("INVALID_PROGRESSION_RULE", "Progression rules require unique IDs, positive versions and non-negative priorities.", rule.id);
+      !Number.isInteger(rule.priority) || rule.priority < 0 ||
+      (rule.activateWhenAnyOf !== undefined &&
+        (rule.activateWhenAnyOf.length === 0 || rule.activateWhenAnyOf.some((alternative) => alternative.length === 0)))) {
+      throw progressionError("INVALID_PROGRESSION_RULE", "Progression rules require unique IDs, positive versions, non-negative priorities and non-empty activation alternatives.", rule.id);
     }
     ruleIds.add(rule.id);
     if ("groupId" in rule.target) {
@@ -243,7 +254,10 @@ function validateProgression(
         throw progressionError("PROGRESSION_TARGET_NOT_AUTOMATABLE", "A progression rule target must be a registered capability with automatic input.", rule.target.capabilityId);
       }
     }
-    for (const reference of rule.activateWhen) {
+    for (const reference of [
+      ...rule.activateWhen,
+      ...(rule.activateWhenAnyOf?.flat() ?? []),
+    ]) {
       if (!dependencyGraph.providersByFact.has(factKey(reference))) {
         throw progressionError("PROGRESSION_ACTIVATION_FACT_NOT_PROVIDED", "A progression activation fact has no registered provider.", factKey(reference));
       }

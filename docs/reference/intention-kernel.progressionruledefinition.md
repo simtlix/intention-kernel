@@ -58,6 +58,27 @@ Confirmed facts that create a distinct activation occurrence.
 </td></tr>
 <tr><td>
 
+[activateWhenAnyOf?](./intention-kernel.progressionruledefinition.activatewhenanyof.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+readonly (readonly [FactReference](./intention-kernel.factreference.md)<!-- -->\[\])\[\]
+
+
+</td><td>
+
+_(Optional)_ Optional conjunction alternatives; at least one complete group is required in addition to activateWhen.
+
+
+</td></tr>
+<tr><td>
+
 [id](./intention-kernel.progressionruledefinition.id.md)
 
 

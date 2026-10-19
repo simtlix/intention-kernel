@@ -231,7 +231,7 @@ describe("grounded response composition", () => {
       });
       expect(response).toMatchObject({
         source: "canonical", grounded: true,
-        message: mode === "fallback" ? message : `${message}\n\n${mode === "required" ? "¿Seguimos?" : "Ana Cordoba. ¿Confirmás?"}`,
+        message: `${message}\n\n${mode === "protected-required" ? "Ana Cordoba. ¿Confirmás?" : "¿Seguimos?"}`,
         claims: [{ text: "La sucursal es Cordoba Centro.", evidenceIds: ["evidence:Cordoba"] }],
       });
       expect(JSON.stringify(brief)).not.toContain("Cordoba");

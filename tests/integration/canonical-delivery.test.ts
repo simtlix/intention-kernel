@@ -49,6 +49,24 @@ function compose(source: ReturnType<typeof input>, gateway: Gateway, briefOverri
 }
 
 describe("canonical delivery authority", () => {
+  it("keeps an optional invitation optional in a completed dependency fallback", async () => {
+    const source = input([{ message: identified, canonical: canonical(identified, "proof-0") }], { ...choice, mode: "optional" });
+    const gateway = new Gateway([]);
+    const response = await compose(source, gateway);
+    expect(response.message).toBe(identified);
+  });
+  it.each(["input", "choice"] as const)("preserves the pending %s after a completed dependency when both drafts are rejected", async (kind) => {
+    const message = "Ya tengo los datos de contacto necesarios.";
+    const pending = { ...choice, kind, goal: "¿En qué provincia vivís?" };
+    const source = input([{ message, canonical: canonical(message, "proof-0") }], pending);
+    const rejected = { ...supported, verdict: "unsupported", continuityVerdict: "violated", unsupportedClaims: ["The pending question is missing."] };
+    const gateway = new Gateway([draft(message, ["proof-0"]), rejected, draft(message, ["proof-0"]), rejected]);
+    const response = await compose(source, gateway);
+    expect(response).toMatchObject({ source: "canonical", grounded: true,
+      message: `${message}\n\n${pending.goal}`, interaction: pending });
+    expect(response.claims).toEqual(canonical(message, "proof-0").claims);
+  });
+
   it.each(["same", "suffix"])("delivers a result whose authoritative invitation is already its %s exactly once", async (mode) => {
     const message = mode === "same" ? question : `No current options were found. ${question}`;
     const source = input([{ message, canonical: canonical(message, "proof-0", true) }],

@@ -242,7 +242,14 @@ export function buildResponseDelivery(options: ResponseInput): ResponseDelivery 
     ...(requiredFallback !== undefined
       ? { canonicalFallback: requiredFallback }
       : completedCount === 1 && canonicalFallbacks.length === 1 && canonicalFallbacks[0] !== undefined
-      ? { canonicalFallback: canonicalFallbacks[0] }
+      ? { canonicalFallback: {
+          ...canonicalFallbacks[0],
+          message: joinCanonicalMessages([
+            canonicalFallbacks[0].message,
+            ...(interactionFallback === undefined || interaction?.mode === "optional"
+              ? [] : [interactionFallback.message]),
+          ]),
+        } }
       : interactionFallback !== undefined
         ? { canonicalFallback: interactionFallback }
         : unsupportedFallback === undefined

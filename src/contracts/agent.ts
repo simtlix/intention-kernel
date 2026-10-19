@@ -67,12 +67,24 @@ function freezeProgression(progression: AgentProgressionDefinition): AgentProgre
       members: Object.freeze(group.members.map((member) => Object.freeze({
         ...member,
         examples: Object.freeze([...member.examples]),
+        ...(member.availableWhen === undefined ? {} : { availableWhen: Object.freeze({
+          ...member.availableWhen,
+          fact: Object.freeze({ ...member.availableWhen.fact }),
+          path: Object.freeze([...member.availableWhen.path]),
+        }) }),
       }))),
     }))),
     rules: Object.freeze(progression.rules.map((rule) => Object.freeze({
       ...rule,
       target: Object.freeze({ ...rule.target }),
       activateWhen: Object.freeze(rule.activateWhen.map((fact) => Object.freeze({ ...fact }))),
+      ...(rule.activateWhenAnyOf === undefined
+        ? {}
+        : {
+            activateWhenAnyOf: Object.freeze(rule.activateWhenAnyOf.map((alternative) => Object.freeze(
+              alternative.map((fact) => Object.freeze({ ...fact })),
+            ))),
+          }),
     }))),
   });
 }

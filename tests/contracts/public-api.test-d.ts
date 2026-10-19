@@ -11,6 +11,7 @@ import {
   type CapabilityResult,
   type Interaction,
   type InteractionOption,
+  type ProgressionRuleDefinition,
 } from "../../src/index.js";
 
 test("keeps contextual wording opt-in without changing the input contract", () => {
@@ -27,6 +28,26 @@ test("keeps reference examples optional and readonly without changing existing o
   expectTypeOf({ id: "a", label: "A", value: 1, referenceExamples: ["first"] as const }).toExtend<InteractionOption>();
   expectTypeOf<InteractionOption["referenceExamples"]>().toEqualTypeOf<readonly string[] | undefined>();
   expectTypeOf({ id: "a", label: "A", value: 1, referenceExamples: [1] }).not.toExtend<InteractionOption>();
+});
+
+test("keeps progression alternatives optional and readonly", () => {
+  const legacy = {
+    id: "contact.after-selection",
+    version: 1,
+    target: { capabilityId: capabilityId("customer.collectContact") },
+    mode: "required" as const,
+    priority: 100,
+    activateWhen: [{ type: factType("catalog.selectedVehicle"), version: 1 }],
+  };
+  const alternatives = [
+    [{ type: factType("tradeIn.quotationReceipt"), version: 1 }],
+    [{ type: factType("budget.tradeInDecision"), version: 1 }],
+  ] as const;
+
+  expectTypeOf(legacy).toExtend<ProgressionRuleDefinition>();
+  expectTypeOf({ ...legacy, activateWhenAnyOf: alternatives }).toExtend<ProgressionRuleDefinition>();
+  expectTypeOf<ProgressionRuleDefinition["activateWhenAnyOf"]>()
+    .toEqualTypeOf<readonly (readonly { readonly type: ReturnType<typeof factType>; readonly version: number }[])[] | undefined>();
 });
 
 test("infers capability input and output without provider types", () => {

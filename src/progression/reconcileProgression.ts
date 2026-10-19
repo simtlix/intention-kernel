@@ -98,6 +98,7 @@ export function reconcileProgression(options: {
       (boundary === undefined || (occurrence.priority < boundary.priority &&
         "capabilityId" in occurrence.target && options.compiled.capabilities.get(occurrence.target.capabilityId)?.effect !== "write" &&
         hasFreshActivation({ ...occurrence, activationFacts: [...occurrence.activationFacts,
+          ...(occurrence.activationSupportFacts ?? []),
           ...completionRevalidationFacts(occurrence, checkpoint, options.compiled)] }, options.checkpoint.facts, options.results ?? [], options.turnPublications))))
     .sort((left, right) => left.priority - right.priority || left.id.localeCompare(right.id))[0];
   if (checkpoint.interaction !== undefined && checkpoint.interaction.mode !== "optional") {
@@ -132,7 +133,7 @@ export function reconcileProgression(options: {
   const groupId = candidate.target.groupId;
   const group = definition.groups.find((entry) => entry.id === groupId);
   if (group === undefined) throw new TypeError("PROGRESSION_GROUP_NOT_COMPILED");
-  const interaction = groupInteraction(candidate, group);
+  const interaction = groupInteraction(candidate, group, checkpoint.facts);
   occurrences = occurrences.map((occurrence) => occurrence.id === candidate.id
     ? { ...occurrence, presented: true }
     : occurrence);
@@ -276,25 +277,30 @@ function reconcileOccurrences(
 ): readonly ProgressionOccurrence[] {
   const next = previous.map((occurrence) => ({ ...occurrence }));
   for (const rule of rules) {
-    const activationFacts = rule.activateWhen.map((reference) => {
-      const fact = facts.find((candidate) => candidate.type === reference.type && candidate.version === reference.version);
-      return fact === undefined ? null : {
-        type: fact.type,
-        version: fact.version,
-        publication: publicationKey(fact),
-      };
-    });
+    const activationFacts = resolvePublications(rule.activateWhen, facts);
     const resolvedActivationFacts = activationFacts.filter(
       (fact): fact is ProgressionOccurrence["activationFacts"][number] => fact !== null,
     );
-    const active = resolvedActivationFacts.length === activationFacts.length;
+    const support = resolveAlternativeSupport(rule.activateWhenAnyOf, facts);
+    const active = resolvedActivationFacts.length === activationFacts.length && support.ready;
     const currentId = active ? occurrenceId(rule.id, resolvedActivationFacts) : null;
+    let existingCurrent = false;
     for (let index = 0; index < next.length; index += 1) {
       const occurrence = next[index];
-      if (occurrence?.ruleId !== rule.id || isTerminal(occurrence.status)) continue;
-      if (currentId === null || occurrence.id !== currentId) next[index] = { ...occurrence, status: "superseded" };
+      if (occurrence?.ruleId !== rule.id) continue;
+      if (currentId !== null && occurrence.id === currentId) {
+        existingCurrent = true;
+        const refreshed = rule.activateWhenAnyOf === undefined
+          ? occurrence
+          : { ...occurrence, activationSupportFacts: support.facts };
+        next[index] = occurrence.status === "superseded"
+          ? { ...refreshed, status: "pending" }
+          : refreshed;
+        continue;
+      }
+      if (!isTerminal(occurrence.status)) next[index] = { ...occurrence, status: "superseded" };
     }
-    if (currentId === null || next.some((occurrence) => occurrence.id === currentId)) continue;
+    if (currentId === null || existingCurrent) continue;
     next.push({
       id: currentId,
       ruleId: rule.id,
@@ -302,6 +308,7 @@ function reconcileOccurrences(
       mode: rule.mode,
       priority: rule.priority,
       activationFacts: resolvedActivationFacts,
+      ...(rule.activateWhenAnyOf === undefined ? {} : { activationSupportFacts: support.facts }),
       status: "pending",
       presented: false,
       completedMembers: [],
@@ -310,23 +317,75 @@ function reconcileOccurrences(
   return Object.freeze(next.map((occurrence) => Object.freeze({
     ...occurrence,
     activationFacts: Object.freeze(occurrence.activationFacts.map((fact) => Object.freeze({ ...fact }))),
+    ...(occurrence.activationSupportFacts === undefined
+      ? {}
+      : {
+          activationSupportFacts: Object.freeze(
+            occurrence.activationSupportFacts.map((fact) => Object.freeze({ ...fact })),
+          ),
+        }),
     completedMembers: Object.freeze([...occurrence.completedMembers]),
   })));
+}
+
+function resolvePublications(
+  references: readonly { readonly type: string; readonly version: number }[],
+  facts: readonly FactRecord[],
+): readonly (ProgressionOccurrence["activationFacts"][number] | null)[] {
+  return references.map((reference) => {
+    const fact = facts.find((candidate) => candidate.type === reference.type && candidate.version === reference.version);
+    return fact === undefined ? null : {
+      type: fact.type,
+      version: fact.version,
+      publication: publicationKey(fact),
+    };
+  });
+}
+
+function resolveAlternativeSupport(
+  alternatives: readonly (readonly { readonly type: string; readonly version: number }[])[] | undefined,
+  facts: readonly FactRecord[],
+): Readonly<{ ready: boolean; facts: readonly ProgressionOccurrence["activationFacts"][number][] }> {
+  if (alternatives === undefined) return { ready: true, facts: [] };
+  const complete = alternatives.flatMap((alternative) => {
+    const resolved = resolvePublications(alternative, facts);
+    return resolved.every((publication) => publication !== null)
+      ? [resolved]
+      : [];
+  });
+  const unique = new Map<string, ProgressionOccurrence["activationFacts"][number]>();
+  for (const publication of complete.flat()) {
+    unique.set(`${publication.type}@${String(publication.version)}:${publication.publication}`, publication);
+  }
+  return { ready: complete.length > 0, facts: [...unique.values()] };
 }
 
 function groupInteraction(
   occurrence: ProgressionOccurrence,
   group: CapabilityGroupDefinition,
+  facts: readonly FactRecord[],
 ): Interaction {
   const hidden = group.completedMemberVisibility === "hide" ? new Set(occurrence.completedMembers) : new Set<CapabilityId>();
-  const prompt = occurrence.presented && group.repeatPrompt !== undefined ? group.repeatPrompt : group.prompt;
+  const available = group.members.filter((member) => {
+    const condition = member.availableWhen;
+    if (condition === undefined) return true;
+    let value: unknown = facts.find((fact) => fact.type === condition.fact.type && fact.version === condition.fact.version)?.value;
+    for (const key of condition.path) {
+      if (value === null || typeof value !== "object" || !Object.hasOwn(value, key)) return false;
+      value = (value as Record<string, unknown>)[key];
+    }
+    return value === condition.equals;
+  });
+  const prompt = available.length !== group.members.length
+    ? group.filteredPrompt ?? group.prompt
+    : occurrence.presented && group.repeatPrompt !== undefined ? group.repeatPrompt : group.prompt;
   return {
     id: `progression:${occurrence.id}` as InteractionId,
     kind: "choice",
     requestedFacts: [],
     goal: prompt,
     options: [
-      ...group.members
+      ...available
         .filter((member) => !hidden.has(member.capabilityId))
         .map((member) => ({
           id: `progression:${occurrence.id}:${member.capabilityId}`,
@@ -349,7 +408,7 @@ function groupInteraction(
       occurrenceId: occurrence.id,
       groupId: group.id,
       groupLabel: group.label,
-      memberExamples: group.members.map((member) => ({
+      memberExamples: available.filter((member) => !hidden.has(member.capabilityId)).map((member) => ({
         capabilityId: member.capabilityId,
         examples: member.examples,
       })),

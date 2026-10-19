@@ -100,6 +100,27 @@ User-visible option that exits the group.
 </td></tr>
 <tr><td>
 
+[filteredPrompt?](./intention-kernel.capabilitygroupdefinition.filteredprompt.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Host-owned question used when availability hides members; required for conditional groups so static copy cannot offer a hidden action.
+
+
+</td></tr>
+<tr><td>
+
 [id](./intention-kernel.capabilitygroupdefinition.id.md)
 
 

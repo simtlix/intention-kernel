@@ -58,6 +58,27 @@ Exact fact publications that activated this occurrence.
 </td></tr>
 <tr><td>
 
+[activationSupportFacts?](./intention-kernel.progressionoccurrence.activationsupportfacts.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+readonly Readonly&lt;{ type: [FactType](./intention-kernel.facttype.md)<!-- -->; version: number; publication: string; }&gt;\[\]
+
+
+</td><td>
+
+_(Optional)_ Exact publications from every currently complete alternative activation group.
+
+
+</td></tr>
+<tr><td>
+
 [activeMember?](./intention-kernel.progressionoccurrence.activemember.md)
 
 

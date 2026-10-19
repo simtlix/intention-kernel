@@ -37,6 +37,27 @@ Description
 </th></tr></thead>
 <tbody><tr><td>
 
+[availableWhen?](./intention-kernel.capabilitygroupmember.availablewhen.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+Readonly&lt;{ readonly fact: [FactReference](./intention-kernel.factreference.md)<!-- -->; readonly path: readonly string\[\]; readonly equals: boolean; }&gt;
+
+
+</td><td>
+
+_(Optional)_ Offer this member only when a confirmed fact contains the exact boolean at this own-property path. Missing facts or fields hide the offer without disabling explicit requests.
+
+
+</td></tr>
+<tr><td>
+
 [capabilityId](./intention-kernel.capabilitygroupmember.capabilityid.md)
 
 

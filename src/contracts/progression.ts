@@ -14,6 +14,12 @@ export interface AgentObjectiveDefinition {
 
 /** One executable member exposed inside a capability group interaction. */
 export interface CapabilityGroupMember {
+  /** Offer this member only when a confirmed fact contains the exact boolean at this own-property path. Missing facts or fields hide the offer without disabling explicit requests. */
+  readonly availableWhen?: Readonly<{
+    readonly fact: FactReference;
+    readonly path: readonly string[];
+    readonly equals: boolean;
+  }>;
   /** Capability invoked when this member is selected. */
   readonly capabilityId: CapabilityId;
   /** User-visible action label. */
@@ -24,6 +30,8 @@ export interface CapabilityGroupMember {
 
 /** Declarative set of related capabilities presented as one bounded interaction. */
 export interface CapabilityGroupDefinition {
+  /** Host-owned question used when availability hides members; required for conditional groups so static copy cannot offer a hidden action. */
+  readonly filteredPrompt?: string;
   /** Stable host-owned group identity. */
   readonly id: string;
   /** Short model- and inspector-visible description. */
@@ -58,6 +66,8 @@ export interface ProgressionRuleDefinition {
   readonly priority: number;
   /** Confirmed facts that create a distinct activation occurrence. */
   readonly activateWhen: readonly FactReference[];
+  /** Optional conjunction alternatives; at least one complete group is required in addition to activateWhen. */
+  readonly activateWhenAnyOf?: readonly (readonly FactReference[])[];
 }
 
 /** Complete declarative progression contract for one compiled agent. */
@@ -109,6 +119,15 @@ export interface ProgressionOccurrence {
   /** Exact fact publications that activated this occurrence. */
   readonly activationFacts: readonly Readonly<{
     /** Fact type that participated in activation. */
+    type: FactType;
+    /** Required fact schema version. */
+    version: number;
+    /** Stable identity of the concrete fact publication. */
+    publication: string;
+  }>[];
+  /** Exact publications from every currently complete alternative activation group. */
+  readonly activationSupportFacts?: readonly Readonly<{
+    /** Fact type that supports alternative readiness without changing occurrence identity. */
     type: FactType;
     /** Required fact schema version. */
     version: number;

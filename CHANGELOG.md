@@ -2,6 +2,14 @@
 
 All notable changes are documented here. The project follows Semantic Versioning after `1.0.0`; during `0.x`, a minor release may change the public API.
 
+## 0.10.0 - 2026-09-23
+
+- Add fact-conditioned group members with matching filtered prompts and semantic examples. Unverified actions remain available on explicit request but are not offered automatically.
+
+## 0.9.0 - 2026-09-16
+
+- Add optional alternative fact groups to progression rules. Common activation facts retain occurrence identity while any complete alternative supplies readiness, so later alternatives within the same scope update support without replaying a completed target.
+
 ## 0.8.3 - 2026-09-10
 
 - Restrict resolved interpretation capabilities to the exact selected executable contracts in both the generated JSON Schema and runtime validation. Initial and repair requests cannot substitute guidance policy IDs or unrelated agent capabilities. Preserve ambiguous, unsupported and conversational turn boundaries when no operation is selected.

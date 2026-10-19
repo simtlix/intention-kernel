@@ -142,6 +142,7 @@ export interface CapabilityGroupDefinition {
     readonly completedMemberVisibility?: "show" | "hide";
     readonly continueExamples?: readonly string[];
     readonly continueLabel: string;
+    readonly filteredPrompt?: string;
     readonly id: string;
     readonly label: string;
     readonly members: readonly CapabilityGroupMember[];
@@ -152,6 +153,11 @@ export interface CapabilityGroupDefinition {
 
 // @public
 export interface CapabilityGroupMember {
+    readonly availableWhen?: Readonly<{
+        readonly fact: FactReference;
+        readonly path: readonly string[];
+        readonly equals: boolean;
+    }>;
     readonly capabilityId: CapabilityId;
     readonly examples: readonly string[];
     readonly label: string;
@@ -768,6 +774,11 @@ export interface ProgressionOccurrence {
         version: number;
         publication: string;
     }>[];
+    readonly activationSupportFacts?: readonly Readonly<{
+        type: FactType;
+        version: number;
+        publication: string;
+    }>[];
     readonly activeMember?: CapabilityId;
     readonly completedMembers: readonly CapabilityId[];
     readonly id: string;
@@ -782,6 +793,7 @@ export interface ProgressionOccurrence {
 // @public
 export interface ProgressionRuleDefinition {
     readonly activateWhen: readonly FactReference[];
+    readonly activateWhenAnyOf?: readonly (readonly FactReference[])[];
     readonly id: string;
     readonly mode: "available" | "offer" | "required";
     readonly priority: number;
@@ -972,6 +984,6 @@ export type ValidationResult<T> = {
 };
 
 // @public
-export const VERSION: "0.8.3";
+export const VERSION: "0.10.0";
 
 ```
